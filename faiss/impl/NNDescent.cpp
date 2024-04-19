@@ -25,6 +25,7 @@ void gen_random(std::mt19937& rng, int* addr, const int size, const int N);
 
 Nhood::Nhood(int l, int s, std::mt19937& rng, int N) {
     M = s;
+    is_deleted = false;
     nn_new.resize(s * 2);
     gen_random(rng, nn_new.data(), (int)nn_new.size(), N);
 }

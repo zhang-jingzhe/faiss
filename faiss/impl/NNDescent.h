@@ -66,7 +66,7 @@ struct Nhood {
     std::mutex lock;
     std::vector<Neighbor> pool; // candidate pool (a max heap)
     int M;                      // number of new neighbors to be operated
-
+    bool is_deleted;
     std::vector<int> nn_old;  // old neighbors
     std::vector<int> nn_new;  // new neighbors
     std::vector<int> rnn_old; // reverse old neighbors

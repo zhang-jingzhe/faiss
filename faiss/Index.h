@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <typeinfo>
+#include <faiss/impl/IDSelector.h>
 
 #define FAISS_VERSION_MAJOR 1
 #define FAISS_VERSION_MINOR 8
@@ -170,6 +171,8 @@ struct Index {
      * indexes. Returns the number of elements removed.
      */
     virtual size_t remove_ids(const IDSelector& sel);
+
+    virtual size_t mark_deleted(const IDSelectorArray& sel);
 
     /** Reconstruct a stored vector (or an approximation if lossy coding)
      *
