@@ -19,6 +19,7 @@ set(FAISS_SRC
   IndexBinaryIVF.cpp
   IndexFlat.cpp
   IndexFlatCodes.cpp
+  IndexFlatUpdate.cpp
   IndexHNSW.cpp
   IndexIDMap.cpp
   IndexIVF.cpp
@@ -111,6 +112,7 @@ set(FAISS_HEADERS
   IndexBinaryIVF.h
   IndexFlat.h
   IndexFlatCodes.h
+  IndexFlatUpdate.h
   IndexHNSW.h
   IndexIDMap.h
   IndexIVF.h

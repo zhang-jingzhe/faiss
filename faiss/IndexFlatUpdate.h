@@ -14,6 +14,8 @@
 
 #include <vector>
 #include <set>
+#include <unordered_map>
+#include <cstring>
 #include <faiss/Index.h>
 #include <faiss/impl/DistanceComputer.h>
 
@@ -25,8 +27,11 @@ struct CodePacker;
  * is in the codes vector */
 struct IndexFlatUpdateCodes : Index {
     size_t code_size;
-    idx_t nremove;  // 被标记删除的点数量
+    idx_t nremove = 0; // 被标记删除的点数量
+    idx_t labelcount = 0; // 记录已添加点的最大label
+    std::unordered_map<int, int> label_lookup_; // label->id
     std::vector<bool> is_deleted;
+    std::vector<idx_t> label; // id->label
     std::set<idx_t> deleted_elements;
     /// encoded dataset, size ntotal * code_size
     std::vector<uint8_t> codes;
@@ -65,19 +70,30 @@ struct IndexFlatUpdate : IndexFlatUpdateCodes {
             idx_t d, ///< dimensionality of the input vectors
             MetricType metric = METRIC_L2);
 
+    void find_vector(const float* x){
+        for (int i = 0; i < ntotal;i++){
+            float *base = new float[d];
+            memcpy(base, &codes.data()[i * d * sizeof(float)], sizeof(float) * d);
+            for (int j = 0; j < d;j++){
+                if(x[j]!=base[j])
+                    break;
+                if(j==d-1&&x[j]==base[j]){
+                    printf("find vector, id:%d, label:%ld\n", i, label[i]);
+                    return;
+                }
+            }
+            delete[] base;
+        }
+        printf("vector not found\n");
+        return;
+    }
+
     void search(
             idx_t n,
             const float* x,
             idx_t k,
             float* distances,
             idx_t* labels,
-            const SearchParameters* params = nullptr) const override;
-
-    void range_search(
-            idx_t n,
-            const float* x,
-            float radius,
-            RangeSearchResult* result,
             const SearchParameters* params = nullptr) const override;
 
     void reconstruct(idx_t key, float* recons) const override;

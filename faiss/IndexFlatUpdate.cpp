@@ -35,64 +35,37 @@ void IndexFlatUpdate::search(
         float* distances,
         idx_t* labels,
         const SearchParameters* params) const {
-    IDSelector* sel = params ? params->sel : nullptr;
+    IDSelector* sel = params ? params->sel : nullptr; // sel有啥用?
     FAISS_THROW_IF_NOT(k > 0);
-
     // we see the distances and labels as heaps
+    //TODO:搜索时将被mark的元素过滤
     if (metric_type == METRIC_INNER_PRODUCT) {
         float_minheap_array_t res = {size_t(n), size_t(k), labels, distances};
         knn_inner_product(x, get_xb(), d, n, ntotal, &res, sel);
+        for (int i = 0; i < res.k * res.nh;i++){
+            res.ids[i] = label[res.ids[i]];
+        }
     } else if (metric_type == METRIC_L2) {
         float_maxheap_array_t res = {size_t(n), size_t(k), labels, distances};
         knn_L2sqr(x, get_xb(), d, n, ntotal, &res, nullptr, sel);
+        for (int i = 0; i < res.k * res.nh; i++) {
+            res.ids[i] = label[res.ids[i]];
+        }
     } else if (is_similarity_metric(metric_type)) {
         float_minheap_array_t res = {size_t(n), size_t(k), labels, distances};
         knn_extra_metrics(
                 x, get_xb(), d, n, ntotal, metric_type, metric_arg, &res);
+        for (int i = 0; i < res.k * res.nh;i++){
+            res.ids[i] = label[res.ids[i]];
+        }
     } else {
         FAISS_THROW_IF_NOT(!sel);
         float_maxheap_array_t res = {size_t(n), size_t(k), labels, distances};
         knn_extra_metrics(
                 x, get_xb(), d, n, ntotal, metric_type, metric_arg, &res);
-    }
-}
-
-void IndexFlatUpdate::range_search(
-        idx_t n,
-        const float* x,
-        float radius,
-        RangeSearchResult* result,
-        const SearchParameters* params) const {
-    IDSelector* sel = params ? params->sel : nullptr;
-
-    switch (metric_type) {
-        case METRIC_INNER_PRODUCT:
-            range_search_inner_product(
-                    x, get_xb(), d, n, ntotal, radius, result, sel);
-            break;
-        case METRIC_L2:
-            range_search_L2sqr(x, get_xb(), d, n, ntotal, radius, result, sel);
-            break;
-        default:
-            FAISS_THROW_MSG("metric type not supported");
-    }
-}
-
-void IndexFlatUpdate::compute_distance_subset(
-        idx_t n,
-        const float* x,
-        idx_t k,
-        float* distances,
-        const idx_t* labels) const {
-    switch (metric_type) {
-        case METRIC_INNER_PRODUCT:
-            fvec_inner_products_by_idx(distances, x, get_xb(), labels, d, n, k);
-            break;
-        case METRIC_L2:
-            fvec_L2sqr_by_idx(distances, x, get_xb(), labels, d, n, k);
-            break;
-        default:
-            FAISS_THROW_MSG("metric type not supported");
+        for (int i = 0; i < res.k * res.nh;i++){
+            res.ids[i] = label[res.ids[i]];
+        }
     }
 }
 
@@ -267,28 +240,57 @@ void IndexFlatUpdateCodes::add(idx_t n, const float* x) {
     }
     codes.resize((ntotal + n) * code_size);
     is_deleted.resize(ntotal + n, false);
+    label.resize(ntotal + n, -1);
     idx_t pos = 0;
+    printf("nremove:%ld\n",nremove);
     if (nremove > 0) {
         while (!deleted_elements.empty()){
             idx_t id_replaced = *deleted_elements.begin();
             deleted_elements.erase(id_replaced);
-            sa_encode(1, &x[pos], codes.data() + (id_replaced * code_size));
+            sa_encode(1, &x[pos*d], codes.data() + (id_replaced * code_size));
             nremove--;
             pos++;
             is_deleted[id_replaced] = false;
-            if(pos == n || nremove == 0){
+            label_lookup_[label[id_replaced]] = -1;
+            label[id_replaced] = labelcount;
+            label_lookup_[labelcount] = id_replaced;
+            labelcount++;
+            if (pos == n || nremove == 0) {
                 break;
             }
         }
-        if(nremove==0){
-            sa_encode(n - pos, &x[pos], codes.data() + (ntotal * code_size));
+        FAISS_THROW_IF_NOT(deleted_elements.size()==nremove);
+        if(pos < n){
+            sa_encode(n - pos, &x[pos*d], codes.data() + (ntotal * code_size));
             ntotal += (n - pos);
+            for (int i = 0; i < (n - pos);i++){
+                label[ntotal] = labelcount;
+                label_lookup_[labelcount] = ntotal;
+                ntotal++;
+                labelcount++;
+            }
         }
     }
     else{
         sa_encode(n, x, codes.data() + (ntotal * code_size));
-        ntotal += n;
+        for (int i = 0; i < n;i++){
+            label[ntotal] = labelcount;
+            label_lookup_[labelcount] = ntotal;
+            ntotal++;
+            labelcount++;
+        }
     }
+    printf("add complete, nremove:%ld\n",nremove);
+    // printf("id:");
+    // for (int i = 0; i < 5000;i++){
+    //     printf("%d ", label_lookup_[i]);
+    // }
+    // printf("\n");
+    // printf("id->label:");
+    // for (int i = 0; i < ntotal;i++){
+    //     printf("%ld ", label[i]);
+    // }
+    // printf("\n");
 }
 
 void IndexFlatUpdateCodes::reset() {
@@ -305,9 +307,10 @@ size_t IndexFlatUpdateCodes::sa_code_size() const {
 size_t IndexFlatUpdateCodes::mark_deleted(const IDSelectorArray& sel) {
     nremove += sel.n;
     for (int i = 0; i < sel.n;i++){
-        FAISS_THROW_IF_NOT(is_deleted[sel.ids[i]] == false);
-        is_deleted[sel.ids[i]] = true;
-        deleted_elements.insert(sel.ids[i]);
+        int id = label_lookup_[sel.ids[i]];
+        FAISS_THROW_IF_NOT(is_deleted[id] == false);
+        is_deleted[id] = true;
+        deleted_elements.insert(id);
     }
     return nremove;
 }

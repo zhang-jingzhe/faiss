@@ -50,6 +50,11 @@ size_t Index::remove_ids(const IDSelector& /*sel*/) {
     return -1;
 }
 
+size_t Index::mark_deleted(const IDSelectorArray& /*sel*/) {
+    FAISS_THROW_MSG("remove_ids not implemented for this type of index");
+    return -1;
+}
+
 void Index::reconstruct(idx_t, float*) const {
     FAISS_THROW_MSG("reconstruct not implemented for this type of index");
 }
