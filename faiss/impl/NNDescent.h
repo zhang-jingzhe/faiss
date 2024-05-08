@@ -67,7 +67,6 @@ struct Nhood {
     std::vector<Neighbor> pool; // candidate pool (a max heap)
     int M;                      // number of new neighbors to be operated
     bool is_deleted;
-    int label;
     std::vector<int> nn_old;  // old neighbors
     std::vector<int> nn_new;  // new neighbors
     std::vector<int> rnn_old; // reverse old neighbors

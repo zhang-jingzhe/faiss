@@ -242,7 +242,7 @@ void IndexFlatUpdateCodes::add(idx_t n, const float* x) {
     is_deleted.resize(ntotal + n, false);
     label.resize(ntotal + n, -1);
     idx_t pos = 0;
-    printf("nremove:%ld\n",nremove);
+    // printf("nremove:%ld\n",nremove);
     if (nremove > 0) {
         while (!deleted_elements.empty()){
             idx_t id_replaced = *deleted_elements.begin();
@@ -280,7 +280,12 @@ void IndexFlatUpdateCodes::add(idx_t n, const float* x) {
             labelcount++;
         }
     }
-    printf("add complete, nremove:%ld\n",nremove);
+    // printf("IndexFlatUpdate: add complete, n:%ld, nremove:%ld, ntotal:%ld\n", n, nremove, ntotal);
+    
+    // float* b = (float*)codes.data();
+    // printf("%f\n", *(b + 24999 * d));
+    // printf("%f\n", *(b + 25000 * d));
+    
     // printf("id:");
     // for (int i = 0; i < 5000;i++){
     //     printf("%d ", label_lookup_[i]);
